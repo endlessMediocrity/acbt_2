@@ -71,6 +71,7 @@ class Block:
     outgoing: List[Connection] = field(default_factory=list)
     connector_ids: List[int] = field(default_factory=list)
     slot_map: Dict[int, Connection] = field(default_factory=dict)
+    indicator_id: Optional[int] = None  # ДОБАВЛЕНО: инициализация indicator_id
 
     def __post_init__(self) -> None:
         self.draw()
@@ -173,6 +174,7 @@ class Block:
         )
         self.draw_connectors()
         self.update_indicator()
+        # ОБНОВЛЯЕМ ВСЕ СОЕДИНЕНИЯ - И ВХОДЯЩИЕ И ИСХОДЯЩИЕ
         for conn in self.incoming + self.outgoing:
             conn.refresh()
 
@@ -208,7 +210,6 @@ class Block:
     def update_label(self) -> None:
         if self.text_id is not None:
             self.app.canvas.itemconfigure(self.text_id, text=self.label_text())
-
 
     def draw_connectors(self) -> None:
         canvas = self.app.canvas
@@ -279,13 +280,17 @@ class Block:
     def update_indicator(self) -> None:
         canvas = self.app.canvas
         if self.kind != "OUTPUT":
-            if self.indicator_id:
+            # ИСПРАВЛЕНО: проверяем существование indicator_id перед удалением
+            if hasattr(self, 'indicator_id') and self.indicator_id:
                 canvas.delete(self.indicator_id)
                 self.indicator_id = None
             return
+        
         radius = 9
         cx = self.x + self.width - 18
         cy = self.y + self.height - 14
+        
+        # ИСПРАВЛЕНО: создаем индикатор если его нет
         if self.indicator_id is None:
             self.indicator_id = canvas.create_oval(
                 cx - radius,
@@ -303,6 +308,7 @@ class Block:
                 cx + radius,
                 cy + radius,
             )
+        
         if self.value is None:
             color = "#b7b7b7"
         elif bool(self.value):
@@ -548,7 +554,7 @@ class LogicBlocksApp:
             self.canvas.delete(block.text_id)
         for cid in block.connector_ids:
             self.canvas.delete(cid)
-        if block.indicator_id:
+        if hasattr(block, 'indicator_id') and block.indicator_id:
             self.canvas.delete(block.indicator_id)
         self.blocks.remove(block)
         self.update_truth_table_widget()
@@ -631,6 +637,7 @@ class LogicBlocksApp:
             for block in self.blocks:
                 block.value = results.get(id(block))
                 block.update_label()
+                block.update_indicator()  # ДОБАВЛЕНО: обновляем индикатор
             self.status_var.set("Расчёт завершён.")
             self.update_truth_table_widget()
         except ValueError as exc:
@@ -738,4 +745,3 @@ class LogicBlocksApp:
 
 if __name__ == "__main__":
     LogicBlocksApp().run()
-
